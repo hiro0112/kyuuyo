@@ -142,14 +142,26 @@
     align-items: center;
     gap: 6px;
   }
-  #yearMultiSelect {
-    min-width: 140px;
+  .year-check-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    max-height: 130px;
+    overflow-y: auto;
+    padding: 8px 12px;
+  }
+  .year-check-group label {
+    font-weight: normal;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 80px;
   }
   .hint {
     color: var(--muted);
     font-size: 0.8rem;
-    margin-top: -8px;
-    margin-bottom: 16px;
+    margin-top: 12px;
+    margin-bottom: 0;
   }
   .chart-wrap {
     position: relative;
@@ -206,10 +218,9 @@
   <!-- 出力タブ -->
   <section id="tab-output" class="tab-page">
     <div class="panel">
-      <div class="field-row">
-        <label for="yearMultiSelect">年度選択</label>
-        <select id="yearMultiSelect" multiple size="6"></select>
-        <span class="hint" style="margin:0;">Ctrl（Macは⌘）キーを押しながらクリックで複数選択できます</span>
+      <div class="field-row" style="align-items: flex-start;">
+        <label style="padding-top: 8px;">年度選択</label>
+        <div class="year-check-group" id="yearCheckGroup"></div>
       </div>
 
       <div class="field-row">
@@ -328,20 +339,30 @@
   }
 
   const yearSelect = document.getElementById("yearSelect");
-  const yearMultiSelect = document.getElementById("yearMultiSelect");
+  const yearCheckGroup = document.getElementById("yearCheckGroup");
   buildYearOptions(yearSelect);
-  buildYearOptions(yearMultiSelect);
 
   const today = new Date();
   let defaultYear = today.getFullYear();
   if (defaultYear < YEAR_MIN) defaultYear = YEAR_MIN;
   if (defaultYear > YEAR_MAX) defaultYear = YEAR_MAX;
   yearSelect.value = String(defaultYear);
-  yearMultiSelect.value = String(defaultYear);
-  // select要素はvalue単体設定だと単一選択になるため、multiple選択を明示的に反映
-  Array.from(yearMultiSelect.options).forEach(opt => {
-    opt.selected = (opt.value === String(defaultYear));
-  });
+
+  function buildYearCheckboxes() {
+    yearCheckGroup.innerHTML = "";
+    for (let y = YEAR_MIN; y <= YEAR_MAX; y++) {
+      const label = document.createElement("label");
+      const cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.className = "year-check";
+      cb.value = String(y);
+      cb.checked = (y === defaultYear);
+      label.appendChild(cb);
+      label.appendChild(document.createTextNode(y + "年"));
+      yearCheckGroup.appendChild(label);
+    }
+  }
+  buildYearCheckboxes();
 
   // ---- 入力タブ：テーブル構築 ----
 
@@ -492,7 +513,7 @@
   let chartInstance = null;
 
   function getSelectedYears() {
-    return Array.from(yearMultiSelect.selectedOptions).map(o => o.value);
+    return Array.from(document.querySelectorAll(".year-check:checked")).map(c => c.value);
   }
 
   function getSelectedContents() {
@@ -576,7 +597,9 @@
     }
   }
 
-  yearMultiSelect.addEventListener("change", renderChart);
+  yearCheckGroup.addEventListener("change", function (e) {
+    if (e.target.classList.contains("year-check")) renderChart();
+  });
   document.querySelectorAll(".content-check").forEach(cb => {
     cb.addEventListener("change", renderChart);
   });
