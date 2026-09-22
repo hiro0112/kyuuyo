@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>給与家計簿</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --panel: #ffffff;
+    --border: #d7dbe0;
+    --text: #1f2430;
+    --muted: #6b7280;
+    --accent: #2563eb;
+    --accent-light: #eaf1ff;
+    --header-bg: #eef1f6;
+    --input-bg: #fffdf5;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Segoe UI", "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  header.app-header {
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 20px 0 20px;
+  }
+  h1 {
+    margin: 0 0 12px 0;
+    font-size: 1.3rem;
+  }
+  .tabs {
+    display: flex;
+    gap: 4px;
+  }
+  .tab-btn {
+    padding: 10px 20px;
+    border: 1px solid var(--border);
+    border-bottom: none;
+    background: var(--header-bg);
+    color: var(--muted);
+    cursor: pointer;
+    border-radius: 8px 8px 0 0;
+    font-size: 0.95rem;
+  }
+  .tab-btn.active {
+    background: var(--panel);
+    color: var(--accent);
+    font-weight: 600;
+    border-color: var(--border);
+  }
+  main {
+    padding: 20px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 0 8px 8px 8px;
+    padding: 20px;
+  }
+  .tab-page { display: none; }
+  .tab-page.active { display: block; }
+  .field-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+  .field-row label { font-weight: 600; }
+  select, .content-check-group {
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: #fff;
+  }
+  .table-scroll {
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 980px;
+  }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 6px 4px;
+    text-align: center;
+    font-size: 0.85rem;
+    white-space: nowrap;
+  }
+  thead th {
+    background: var(--header-bg);
+    position: sticky;
+    top: 0;
+  }
+  tbody th {
+    background: var(--header-bg);
+    text-align: left;
+    padding-left: 10px;
+    min-width: 100px;
+  }
+  td.bonus-col, th.bonus-col {
+    background: #fff7e6;
+  }
+  td.total-col {
+    background: var(--accent-light);
+    font-weight: 600;
+  }
+  input.cell-input {
+    width: 86px;
+    padding: 4px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    text-align: right;
+    background: var(--input-bg);
+    font-size: 0.85rem;
+  }
+  input.cell-input:focus {
+    outline: 2px solid var(--accent);
+    outline-offset: -1px;
+  }
+  td.readonly-cell {
+    font-variant-numeric: tabular-nums;
+  }
+  .content-check-group {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .content-check-group label {
+    font-weight: normal;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  #yearMultiSelect {
+    min-width: 140px;
+  }
+  .hint {
+    color: var(--muted);
+    font-size: 0.8rem;
+    margin-top: -8px;
+    margin-bottom: 16px;
+  }
+  .chart-wrap {
+    position: relative;
+    height: 420px;
+  }
+  .empty-msg {
+    color: var(--muted);
+    text-align: center;
+    padding: 60px 0;
+  }
+  footer {
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.75rem;
+    padding: 24px 0;
+  }
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <h1>給与家計簿</h1>
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="input">入力欄</button>
+    <button class="tab-btn" data-tab="output">出力欄</button>
+  </div>
+</header>
+
+<main>
+  <!-- 入力タブ -->
+  <section id="tab-input" class="tab-page active">
+    <div class="panel">
+      <div class="field-row">
+        <label for="yearSelect">年度</label>
+        <select id="yearSelect"></select>
+      </div>
+
+      <div class="table-scroll">
+        <table id="inputTable">
+          <thead>
+            <tr id="headerRow"></tr>
+          </thead>
+          <tbody>
+            <tr id="salaryRow"><th>給与額</th></tr>
+            <tr id="deductionRow"><th>控除額</th></tr>
+            <tr id="actualRow"><th>実際支給額</th></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="hint">※ 給与額・控除額は手入力してください。実際支給額と合計欄は自動計算されます。データはこのブラウザ内に保存されます。</p>
+    </div>
+  </section>
+
+  <!-- 出力タブ -->
+  <section id="tab-output" class="tab-page">
+    <div class="panel">
+      <div class="field-row">
+        <label for="yearMultiSelect">年度選択</label>
+        <select id="yearMultiSelect" multiple size="6"></select>
+        <span class="hint" style="margin:0;">Ctrl（Macは⌘）キーを押しながらクリックで複数選択できます</span>
+      </div>
+
+      <div class="field-row">
+        <label>内容選択</label>
+        <div class="content-check-group">
+          <label><input type="checkbox" class="content-check" value="salary" checked> 給与額</label>
+          <label><input type="checkbox" class="content-check" value="deduction"> 控除額</label>
+          <label><input type="checkbox" class="content-check" value="actual"> 実際支給額</label>
+        </div>
+      </div>
+
+      <div class="chart-wrap">
+        <canvas id="trendChart"></canvas>
+        <div id="chartEmptyMsg" class="empty-msg" style="display:none;">年度と内容を選択してください</div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>データはこの端末のブラウザにのみ保存され、他の利用者と共有されません。</footer>
+
+<script>
+(function () {
+  "use strict";
+
+  const YEAR_MIN = 2020;
+  const YEAR_MAX = 2040;
+  const STORAGE_KEY = "kyuuyoKakeiboData_v1";
+
+  const COLUMNS = [
+    { key: "m1", label: "1月" },
+    { key: "m2", label: "2月" },
+    { key: "m3", label: "3月" },
+    { key: "m4", label: "4月" },
+    { key: "m5", label: "5月" },
+    { key: "m6", label: "6月" },
+    { key: "bonusSummer", label: "夏ボーナス", bonus: true },
+    { key: "m7", label: "7月" },
+    { key: "m8", label: "8月" },
+    { key: "m9", label: "9月" },
+    { key: "m10", label: "10月" },
+    { key: "m11", label: "11月" },
+    { key: "m12", label: "12月" },
+    { key: "bonusWinter", label: "冬ボーナス", bonus: true }
+  ];
+
+  const CONTENT_LABELS = {
+    salary: "給与額",
+    deduction: "控除額",
+    actual: "実際支給額"
+  };
+
+  const LINE_COLORS = [
+    "#2563eb", "#dc2626", "#059669", "#d97706",
+    "#7c3aed", "#db2777", "#0891b2", "#65a30d",
+    "#9333ea", "#ea580c"
+  ];
+
+  // ---- ストレージ操作 ----
+
+  function loadStore() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch (e) {
+      console.error("データの読み込みに失敗しました", e);
+      return {};
+    }
+  }
+
+  function saveStore(store) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+    } catch (e) {
+      console.error("データの保存に失敗しました", e);
+    }
+  }
+
+  let store = loadStore();
+
+  function getYearData(year) {
+    if (!store[year]) {
+      store[year] = { salary: {}, deduction: {} };
+    }
+    if (!store[year].salary) store[year].salary = {};
+    if (!store[year].deduction) store[year].deduction = {};
+    return store[year];
+  }
+
+  function getCellValue(year, type, key) {
+    const yd = getYearData(year);
+    const v = yd[type][key];
+    return typeof v === "number" && !isNaN(v) ? v : 0;
+  }
+
+  function setCellValue(year, type, key, value) {
+    const yd = getYearData(year);
+    if (value === "" || value === null || isNaN(value)) {
+      delete yd[type][key];
+    } else {
+      yd[type][key] = Number(value);
+    }
+    saveStore(store);
+  }
+
+  // ---- 年度セレクト構築 ----
+
+  function buildYearOptions(selectEl, multiple) {
+    selectEl.innerHTML = "";
+    for (let y = YEAR_MIN; y <= YEAR_MAX; y++) {
+      const opt = document.createElement("option");
+      opt.value = String(y);
+      opt.textContent = y + "年";
+      selectEl.appendChild(opt);
+    }
+  }
+
+  const yearSelect = document.getElementById("yearSelect");
+  const yearMultiSelect = document.getElementById("yearMultiSelect");
+  buildYearOptions(yearSelect);
+  buildYearOptions(yearMultiSelect);
+
+  const today = new Date();
+  let defaultYear = today.getFullYear();
+  if (defaultYear < YEAR_MIN) defaultYear = YEAR_MIN;
+  if (defaultYear > YEAR_MAX) defaultYear = YEAR_MAX;
+  yearSelect.value = String(defaultYear);
+  yearMultiSelect.value = String(defaultYear);
+  // select要素はvalue単体設定だと単一選択になるため、multiple選択を明示的に反映
+  Array.from(yearMultiSelect.options).forEach(opt => {
+    opt.selected = (opt.value === String(defaultYear));
+  });
+
+  // ---- 入力タブ：テーブル構築 ----
+
+  const headerRow = document.getElementById("headerRow");
+  const salaryRow = document.getElementById("salaryRow");
+  const deductionRow = document.getElementById("deductionRow");
+  const actualRow = document.getElementById("actualRow");
+
+  function buildHeaderRow() {
+    headerRow.innerHTML = "<th>月</th>";
+    COLUMNS.forEach(col => {
+      const th = document.createElement("th");
+      th.textContent = col.label;
+      if (col.bonus) th.classList.add("bonus-col");
+      headerRow.appendChild(th);
+    });
+    const totalTh = document.createElement("th");
+    totalTh.textContent = "合計";
+    headerRow.appendChild(totalTh);
+  }
+
+  function buildInputRow(rowEl, type) {
+    // ヘッダーセル（給与額/控除額）は既にHTMLにあるので、その後ろにセルを追加
+    while (rowEl.children.length > 1) rowEl.removeChild(rowEl.lastChild);
+    COLUMNS.forEach(col => {
+      const td = document.createElement("td");
+      if (col.bonus) td.classList.add("bonus-col");
+      const input = document.createElement("input");
+      input.type = "number";
+      input.className = "cell-input";
+      input.dataset.type = type;
+      input.dataset.key = col.key;
+      td.appendChild(input);
+      rowEl.appendChild(td);
+    });
+    const totalTd = document.createElement("td");
+    totalTd.className = "total-col readonly-cell";
+    totalTd.dataset.role = "total";
+    totalTd.dataset.type = type;
+    rowEl.appendChild(totalTd);
+  }
+
+  function buildActualRow() {
+    while (actualRow.children.length > 1) actualRow.removeChild(actualRow.lastChild);
+    COLUMNS.forEach(col => {
+      const td = document.createElement("td");
+      if (col.bonus) td.classList.add("bonus-col");
+      td.className += (td.className ? " " : "") + "readonly-cell";
+      td.dataset.role = "actual";
+      td.dataset.key = col.key;
+      actualRow.appendChild(td);
+    });
+    const totalTd = document.createElement("td");
+    totalTd.className = "total-col readonly-cell";
+    totalTd.dataset.role = "actualTotal";
+    actualRow.appendChild(totalTd);
+  }
+
+  buildHeaderRow();
+  buildInputRow(salaryRow, "salary");
+  buildInputRow(deductionRow, "deduction");
+  buildActualRow();
+
+  function formatNum(n) {
+    return n.toLocaleString("ja-JP");
+  }
+
+  function renderInputTableForYear(year) {
+    const yd = getYearData(year);
+    COLUMNS.forEach(col => {
+      const salaryInput = salaryRow.querySelector('input[data-key="' + col.key + '"]');
+      const deductionInput = deductionRow.querySelector('input[data-key="' + col.key + '"]');
+      const salaryVal = yd.salary[col.key];
+      const deductionVal = yd.deduction[col.key];
+      salaryInput.value = (typeof salaryVal === "number") ? salaryVal : "";
+      deductionInput.value = (typeof deductionVal === "number") ? deductionVal : "";
+    });
+    recomputeInputTable(year);
+  }
+
+  function recomputeInputTable(year) {
+    let salaryTotal = 0;
+    let deductionTotal = 0;
+    let actualTotal = 0;
+
+    COLUMNS.forEach(col => {
+      const s = getCellValue(year, "salary", col.key);
+      const d = getCellValue(year, "deduction", col.key);
+      const actual = s - d;
+
+      salaryTotal += s;
+      deductionTotal += d;
+      actualTotal += actual;
+
+      const actualCell = actualRow.querySelector('[data-role="actual"][data-key="' + col.key + '"]');
+      actualCell.textContent = formatNum(actual);
+    });
+
+    salaryRow.querySelector('[data-role="total"][data-type="salary"]').textContent = formatNum(salaryTotal);
+    deductionRow.querySelector('[data-role="total"][data-type="deduction"]').textContent = formatNum(deductionTotal);
+    actualRow.querySelector('[data-role="actualTotal"]').textContent = formatNum(actualTotal);
+  }
+
+  document.getElementById("inputTable").addEventListener("input", function (e) {
+    const target = e.target;
+    if (!target.classList.contains("cell-input")) return;
+    const year = yearSelect.value;
+    const type = target.dataset.type;
+    const key = target.dataset.key;
+    const raw = target.value;
+    setCellValue(year, type, key, raw === "" ? "" : Number(raw));
+    recomputeInputTable(year);
+    if (isOutputTabActive()) renderChart();
+  });
+
+  yearSelect.addEventListener("change", function () {
+    renderInputTableForYear(yearSelect.value);
+  });
+
+  renderInputTableForYear(yearSelect.value);
+
+  // ---- タブ切り替え ----
+
+  const tabButtons = document.querySelectorAll(".tab-btn");
+  const tabPages = {
+    input: document.getElementById("tab-input"),
+    output: document.getElementById("tab-output")
+  };
+
+  function isOutputTabActive() {
+    return tabPages.output.classList.contains("active");
+  }
+
+  tabButtons.forEach(btn => {
+    btn.addEventListener("click", function () {
+      tabButtons.forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      Object.values(tabPages).forEach(p => p.classList.remove("active"));
+      tabPages[btn.dataset.tab].classList.add("active");
+      if (btn.dataset.tab === "output") renderChart();
+    });
+  });
+
+  // ---- 出力タブ：グラフ ----
+
+  const chartCanvas = document.getElementById("trendChart");
+  const chartEmptyMsg = document.getElementById("chartEmptyMsg");
+  let chartInstance = null;
+
+  function getSelectedYears() {
+    return Array.from(yearMultiSelect.selectedOptions).map(o => o.value);
+  }
+
+  function getSelectedContents() {
+    return Array.from(document.querySelectorAll(".content-check:checked")).map(c => c.value);
+  }
+
+  function computeSeries(year, contentType) {
+    return COLUMNS.map(col => {
+      const s = getCellValue(year, "salary", col.key);
+      const d = getCellValue(year, "deduction", col.key);
+      if (contentType === "salary") return s;
+      if (contentType === "deduction") return d;
+      return s - d; // actual
+    });
+  }
+
+  function renderChart() {
+    const years = getSelectedYears();
+    const contents = getSelectedContents();
+    const labels = COLUMNS.map(c => c.label);
+
+    if (years.length === 0 || contents.length === 0) {
+      if (chartInstance) {
+        chartInstance.destroy();
+        chartInstance = null;
+      }
+      chartCanvas.style.display = "none";
+      chartEmptyMsg.style.display = "block";
+      return;
+    }
+    chartCanvas.style.display = "block";
+    chartEmptyMsg.style.display = "none";
+
+    const datasets = [];
+    let colorIdx = 0;
+    years.forEach(year => {
+      contents.forEach(contentType => {
+        const color = LINE_COLORS[colorIdx % LINE_COLORS.length];
+        colorIdx++;
+        datasets.push({
+          label: year + "年 " + CONTENT_LABELS[contentType],
+          data: computeSeries(year, contentType),
+          borderColor: color,
+          backgroundColor: color,
+          fill: false,
+          tension: 0.25,
+          spanGaps: true
+        });
+      });
+    });
+
+    if (chartInstance) {
+      chartInstance.data.labels = labels;
+      chartInstance.data.datasets = datasets;
+      chartInstance.update();
+    } else {
+      chartInstance = new Chart(chartCanvas, {
+        type: "line",
+        data: { labels: labels, datasets: datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: {
+              ticks: {
+                callback: function (value) { return formatNum(value); }
+              }
+            }
+          },
+          plugins: {
+            tooltip: {
+              callbacks: {
+                label: function (ctx) {
+                  return ctx.dataset.label + ": " + formatNum(ctx.parsed.y);
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+  }
+
+  yearMultiSelect.addEventListener("change", renderChart);
+  document.querySelectorAll(".content-check").forEach(cb => {
+    cb.addEventListener("change", renderChart);
+  });
+
+})();
+</script>
+
+</body>
+</html>
