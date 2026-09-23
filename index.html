@@ -557,10 +557,7 @@
           label: year + "年 " + CONTENT_LABELS[contentType],
           data: computeSeries(year, contentType),
           borderColor: color,
-          backgroundColor: color,
-          fill: false,
-          tension: 0.25,
-          spanGaps: true
+          backgroundColor: color
         });
       });
     });
@@ -571,7 +568,7 @@
       chartInstance.update();
     } else {
       chartInstance = new Chart(chartCanvas, {
-        type: "line",
+        type: "bar",
         data: { labels: labels, datasets: datasets },
         options: {
           responsive: true,
